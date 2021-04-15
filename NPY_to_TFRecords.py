@@ -64,10 +64,6 @@ def batch_create_records(filenames, v):
         writer.close()
 
 
-# -----ONE SHOT CODE
-# batch_create_records("./NPYs/npy0.45.npy","0.45")
-# exit()
-
 
 # count = 0.1
 # upper = 1

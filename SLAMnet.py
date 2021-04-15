@@ -1,6 +1,5 @@
 import netgen.gui
 from ngsolve import *
-import meshes as me
 import tensorflow as tf
 import numpy as np
 import openpyxl as xl
@@ -13,6 +12,7 @@ import matplotlib.pyplot as plt
 import math
 from netgen.geom2d import SplineGeometry
 from ngsolve import internal as ngsint
+
 
 # VISUALIZATION OPTIONS
 # ngsint.viewoptions.drawoutline= 1
@@ -33,7 +33,7 @@ model = tf.keras.models.load_model("FINAL_MODEL.model")
 
 view_NN_output = False
 scaledModel = True
-saveOutput = 20000000000000
+saveOutput = 10000
 timejump = 0.02 * NN_num_of_repeat
 # Newly defined geometry parameters
 geoLength = 2
@@ -43,14 +43,15 @@ numVerty = 66
 geoVertxSpacing = geoLength / (numVertx - 1)
 geoVertySpacing = geoHeight / (numVerty - 1)
 side = 0.1
-tstop = 1.04
+tstop = 5
 timerstart = time.time()
+output_image = False
+
 
 geo = SplineGeometry()
 geo.AddRectangle((0, 0), (geoLength, geoHeight),
                  bcs=("wall", "outlet", "wall", "inlet"))  # original length,Height are 2,0.41
 # geo.AddCircle ( (geoHeight/2, geoHeight/2), r=0.05, leftdomain=0, rightdomain=1, bc="cyl", maxh=0.02)
-# geo.AddCircle ( (1.4, 0.5), r=0.05, leftdomain=0, rightdomain=1, bc="cyl", maxh=0.02)
 geo.AddRectangle((math.floor((geoHeight / 2 - side / 2) / geoVertxSpacing) * geoVertxSpacing,
                   math.floor((geoHeight / 2 - side / 2) / geoVertySpacing) * geoVertySpacing), (
                      math.floor((geoHeight / 2 + side / 2) / geoVertxSpacing) * geoVertxSpacing,
@@ -59,10 +60,6 @@ geo.AddRectangle((math.floor((geoHeight / 2 - side / 2) / geoVertxSpacing) * geo
 
 
 mesh = Mesh(geo.GenerateMesh(maxh=0.07))
-
-structmesh = me.MakeQuadMesh(nx=(numVertx - 1), ny=(numVerty - 1), mapping=lambda x, y: (geoLength * x, geoHeight * y))
-
-
 mesh.Curve(3)
 
 # V = VectorH1(mesh,order=3, dirichlet="wall|cyl|inlet")
@@ -151,10 +148,7 @@ i = 0
 t = 0
 file_Data_Counter = 0
 
-NN_struct_fes = H1(structmesh, order=1)
-NN_struct_gfu = GridFunction(NN_struct_fes)
 
-ancTemp = inv_stokes * res
 PNG_count = 0
 with TaskManager():
     while t < tend:
@@ -185,6 +179,7 @@ with TaskManager():
                     velocity_data_x[row, column] = 0
                     velocity_data_y[row, column] = 0
 
+            # The code below is used to export CSVs if desired
             # for z in range(numVertx*numVerty): #structmesh.vertices:
             #     #This version does not rely on the L2 interpolation onto the structured mesh. The for loop needs revision though. simply numVertx*numVerty
             #     row = int(z / numVertx)
@@ -243,12 +238,10 @@ with TaskManager():
                 plt.show()
                 input("Pause")
             flow_tensor = flow_tensor.astype('float64')
-            #########################################
             flow_tensor[0, 0, :, 1] = 0
             flow_tensor[0, 0, :, 2] = 0
             flow_tensor[0, -1, :, 1] = 0
             flow_tensor[0, -1, :, 2] = 0
-            #########################################
 
             vox_flow_tensor_pressure = VoxelCoefficient((0, 0), (geoLength, geoHeight), flow_tensor[0, 0:66, 0:256, 0],
                                                         linear=True)
@@ -294,10 +287,10 @@ with TaskManager():
             # input("Inserted soln")
             flow_tensor = np.ones((3, numVerty, numVertx))
 
-        if t >= tstop:
+        if t >= tstop and output_image is True:
             netgen.gui.Snapshot(w=2000, h=2000, filename="./Square/fastGT" + str(t) + ".png")
-            # ---------------------------------------------------------------------------
 
+            # This code block allows for CSVs to be exported
             # pressure_data_flat = gfu.components[1](mesh(xPoints, yPoints))
             # velocity_data_x_flat = gfu.components[0][0](mesh(xPoints, yPoints))
             # velocity_data_y_flat = gfu.components[0][1](mesh(xPoints, yPoints))
